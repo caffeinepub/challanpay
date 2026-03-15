@@ -89,6 +89,15 @@ export class ExternalBlob {
         return this;
     }
 }
+export interface UtrRecord {
+    id: bigint;
+    utr: string;
+    status: UtrStatus;
+    challanId: bigint;
+    vehicleNumber: string;
+    submittedAt: string;
+    amount: bigint;
+}
 export interface Challan {
     id: bigint;
     status: Status;
@@ -104,14 +113,25 @@ export enum Status {
     pending = "pending",
     paid = "paid"
 }
+export enum UtrStatus {
+    pending = "pending",
+    approved = "approved",
+    rejected = "rejected"
+}
 export interface backendInterface {
     addChallan(vehicleNumber: string, violationType: string, fineAmount: bigint, date: string, location: string, officerName: string): Promise<bigint>;
+    approveUtr(utrId: bigint): Promise<void>;
     getChallan(id: bigint): Promise<Challan>;
     getChallansByVehicle(vehicleNumber: string): Promise<Array<Challan>>;
+    getUpiId(): Promise<string | null>;
+    getUtrSubmissions(): Promise<Array<UtrRecord>>;
     payChallan(id: bigint): Promise<void>;
+    rejectUtr(utrId: bigint): Promise<void>;
     seedSampleData(): Promise<void>;
+    setUpiId(newUpiId: string): Promise<void>;
+    submitUtr(challanId: bigint, vehicleNumber: string, amount: bigint, utr: string, submittedAt: string): Promise<bigint>;
 }
-import type { Challan as _Challan, Status as _Status } from "./declarations/backend.did.d.ts";
+import type { Challan as _Challan, Status as _Status, UtrRecord as _UtrRecord, UtrStatus as _UtrStatus } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async addChallan(arg0: string, arg1: string, arg2: bigint, arg3: string, arg4: string, arg5: string): Promise<bigint> {
@@ -125,6 +145,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.addChallan(arg0, arg1, arg2, arg3, arg4, arg5);
+            return result;
+        }
+    }
+    async approveUtr(arg0: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.approveUtr(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.approveUtr(arg0);
             return result;
         }
     }
@@ -156,6 +190,34 @@ export class Backend implements backendInterface {
             return from_candid_vec_n5(this._uploadFile, this._downloadFile, result);
         }
     }
+    async getUpiId(): Promise<string | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getUpiId();
+                return from_candid_opt_n6(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getUpiId();
+            return from_candid_opt_n6(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getUtrSubmissions(): Promise<Array<UtrRecord>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getUtrSubmissions();
+                return from_candid_vec_n7(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getUtrSubmissions();
+            return from_candid_vec_n7(this._uploadFile, this._downloadFile, result);
+        }
+    }
     async payChallan(arg0: bigint): Promise<void> {
         if (this.processError) {
             try {
@@ -167,6 +229,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.payChallan(arg0);
+            return result;
+        }
+    }
+    async rejectUtr(arg0: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.rejectUtr(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.rejectUtr(arg0);
             return result;
         }
     }
@@ -184,12 +260,49 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async setUpiId(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.setUpiId(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.setUpiId(arg0);
+            return result;
+        }
+    }
+    async submitUtr(arg0: bigint, arg1: string, arg2: bigint, arg3: string, arg4: string): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.submitUtr(arg0, arg1, arg2, arg3, arg4);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.submitUtr(arg0, arg1, arg2, arg3, arg4);
+            return result;
+        }
+    }
 }
 function from_candid_Challan_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Challan): Challan {
     return from_candid_record_n2(_uploadFile, _downloadFile, value);
 }
 function from_candid_Status_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Status): Status {
     return from_candid_variant_n4(_uploadFile, _downloadFile, value);
+}
+function from_candid_UtrRecord_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UtrRecord): UtrRecord {
+    return from_candid_record_n9(_uploadFile, _downloadFile, value);
+}
+function from_candid_UtrStatus_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UtrStatus): UtrStatus {
+    return from_candid_variant_n11(_uploadFile, _downloadFile, value);
+}
+function from_candid_opt_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
+    return value.length === 0 ? null : value[0];
 }
 function from_candid_record_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: bigint;
@@ -224,6 +337,42 @@ function from_candid_record_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint
         violationType: value.violationType
     };
 }
+function from_candid_record_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    id: bigint;
+    utr: string;
+    status: _UtrStatus;
+    challanId: bigint;
+    vehicleNumber: string;
+    submittedAt: string;
+    amount: bigint;
+}): {
+    id: bigint;
+    utr: string;
+    status: UtrStatus;
+    challanId: bigint;
+    vehicleNumber: string;
+    submittedAt: string;
+    amount: bigint;
+} {
+    return {
+        id: value.id,
+        utr: value.utr,
+        status: from_candid_UtrStatus_n10(_uploadFile, _downloadFile, value.status),
+        challanId: value.challanId,
+        vehicleNumber: value.vehicleNumber,
+        submittedAt: value.submittedAt,
+        amount: value.amount
+    };
+}
+function from_candid_variant_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    pending: null;
+} | {
+    approved: null;
+} | {
+    rejected: null;
+}): UtrStatus {
+    return "pending" in value ? UtrStatus.pending : "approved" in value ? UtrStatus.approved : "rejected" in value ? UtrStatus.rejected : value;
+}
 function from_candid_variant_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     pending: null;
 } | {
@@ -233,6 +382,9 @@ function from_candid_variant_n4(_uploadFile: (file: ExternalBlob) => Promise<Uin
 }
 function from_candid_vec_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Challan>): Array<Challan> {
     return value.map((x)=>from_candid_Challan_n1(_uploadFile, _downloadFile, x));
+}
+function from_candid_vec_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_UtrRecord>): Array<UtrRecord> {
+    return value.map((x)=>from_candid_UtrRecord_n8(_uploadFile, _downloadFile, x));
 }
 export interface CreateActorOptions {
     agent?: Agent;

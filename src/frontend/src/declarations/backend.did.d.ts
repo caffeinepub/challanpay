@@ -23,15 +23,33 @@ export interface Challan {
 }
 export type Status = { 'pending' : null } |
   { 'paid' : null };
+export interface UtrRecord {
+  'id' : bigint,
+  'utr' : string,
+  'status' : UtrStatus,
+  'challanId' : bigint,
+  'vehicleNumber' : string,
+  'submittedAt' : string,
+  'amount' : bigint,
+}
+export type UtrStatus = { 'pending' : null } |
+  { 'approved' : null } |
+  { 'rejected' : null };
 export interface _SERVICE {
   'addChallan' : ActorMethod<
     [string, string, bigint, string, string, string],
     bigint
   >,
+  'approveUtr' : ActorMethod<[bigint], undefined>,
   'getChallan' : ActorMethod<[bigint], Challan>,
   'getChallansByVehicle' : ActorMethod<[string], Array<Challan>>,
+  'getUpiId' : ActorMethod<[], [] | [string]>,
+  'getUtrSubmissions' : ActorMethod<[], Array<UtrRecord>>,
   'payChallan' : ActorMethod<[bigint], undefined>,
+  'rejectUtr' : ActorMethod<[bigint], undefined>,
   'seedSampleData' : ActorMethod<[], undefined>,
+  'setUpiId' : ActorMethod<[string], undefined>,
+  'submitUtr' : ActorMethod<[bigint, string, bigint, string, string], bigint>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

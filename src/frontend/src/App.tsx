@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock,
+  Copy,
   IndianRupee,
   Loader2,
   MapPin,
@@ -28,14 +29,17 @@ import {
   Zap,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { AdminApp } from "./AdminApp";
 import type { Challan } from "./backend.d";
 import { Status } from "./backend.d";
 import {
   useGetChallansByVehicle,
+  useGetUpiId,
   usePayChallan,
   useSeedSampleData,
+  useSubmitUtr,
 } from "./hooks/useQueries";
 
 const queryClient = new QueryClient();
@@ -64,28 +68,71 @@ function PaymentModal({
   challan,
   open,
   onClose,
-  onConfirm,
-  isLoading,
-  isPaid,
 }: {
   challan: Challan | null;
   open: boolean;
   onClose: () => void;
-  onConfirm: () => void;
-  isLoading: boolean;
-  isPaid: boolean;
 }) {
+  const [utrInput, setUtrInput] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const { data: upiId, isLoading: upiLoading } = useGetUpiId();
+  const { mutate: submitUtr, isPending: isSubmitting } = useSubmitUtr();
+
   if (!challan) return null;
+
   const savings = challan.fineAmount - challan.discountedAmount;
   const discountPct = Math.round(
     (Number(savings) / Number(challan.fineAmount)) * 100,
   );
 
+  const handleClose = () => {
+    setUtrInput("");
+    setSubmitted(false);
+    onClose();
+  };
+
+  const handleSubmitUtr = () => {
+    const trimmed = utrInput.trim();
+    if (!trimmed) {
+      toast.error("Please enter your UTR number");
+      return;
+    }
+    if (trimmed.length < 6) {
+      toast.error("UTR number seems too short. Please check and re-enter.");
+      return;
+    }
+    submitUtr(
+      {
+        challanId: challan.id,
+        vehicleNumber: challan.vehicleNumber,
+        amount: challan.discountedAmount,
+        utr: trimmed,
+        submittedAt: new Date().toISOString(),
+      },
+      {
+        onSuccess: () => {
+          setSubmitted(true);
+          toast.success("UTR submitted for verification!");
+        },
+        onError: () => {
+          toast.error("Submission failed. Please try again.");
+        },
+      },
+    );
+  };
+
+  const handleCopyUpi = () => {
+    if (upiId) {
+      navigator.clipboard.writeText(upiId);
+      toast.success("UPI ID copied!");
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
       <DialogContent className="max-w-md" data-ocid="payment.dialog">
         <AnimatePresence mode="wait">
-          {isPaid ? (
+          {submitted ? (
             <motion.div
               key="success"
               initial={{ opacity: 0, scale: 0.9 }}
@@ -108,23 +155,24 @@ function PaymentModal({
               </motion.div>
               <div className="text-center">
                 <h3 className="font-display font-bold text-2xl text-foreground mb-1">
-                  Payment Successful!
+                  Payment Under Review!
                 </h3>
                 <p className="text-muted-foreground text-sm">
-                  Challan #{challan.id.toString()} has been cleared
+                  We'll confirm once your UTR is verified.
                 </p>
               </div>
-              <div className="bg-green-50 border border-green-200 rounded-xl p-4 w-full text-center">
-                <p className="text-sm text-muted-foreground">You saved</p>
-                <p className="font-display font-bold text-2xl text-success">
-                  {formatCurrency(savings)}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 w-full">
+                <p className="text-xs font-semibold text-blue-800 mb-1">
+                  What happens next?
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  with our {discountPct}% discount
-                </p>
+                <ul className="text-xs text-blue-700 space-y-1">
+                  <li>• Our team will verify your UTR number</li>
+                  <li>• Challan status will be updated within 24 hours</li>
+                  <li>• You'll receive confirmation on approval</li>
+                </ul>
               </div>
               <Button
-                onClick={onClose}
+                onClick={handleClose}
                 className="w-full"
                 data-ocid="payment.close_button"
               >
@@ -140,10 +188,11 @@ function PaymentModal({
             >
               <DialogHeader>
                 <DialogTitle className="font-display text-xl">
-                  Confirm Payment
+                  Pay via Paytm UPI
                 </DialogTitle>
               </DialogHeader>
 
+              {/* Challan summary */}
               <div className="bg-muted/60 rounded-xl p-4 space-y-3">
                 <div className="flex items-start gap-3">
                   <span className="text-2xl">
@@ -161,74 +210,136 @@ function PaymentModal({
                     </p>
                   </div>
                 </div>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-2">
+                <Separator />
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground text-sm">
-                    Original Fine
-                  </span>
-                  <span className="line-through text-muted-foreground">
-                    {formatCurrency(challan.fineAmount)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">
-                    Discount ({discountPct}%)
-                  </span>
-                  <span className="text-success font-medium">
-                    −{formatCurrency(savings)}
-                  </span>
-                </div>
-                <Separator className="my-1" />
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-foreground">
-                    Amount to Pay
-                  </span>
-                  <span className="font-display font-bold text-2xl text-primary">
-                    {formatCurrency(challan.discountedAmount)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center gap-2">
-                <Tag className="w-4 h-4 text-amber-600 shrink-0" />
-                <p className="text-xs text-amber-700 font-medium">
-                  Limited time offer — pay now & save {formatCurrency(savings)}!
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={onClose}
-                  disabled={isLoading}
-                  data-ocid="payment.cancel_button"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="flex-1"
-                  onClick={onConfirm}
-                  disabled={isLoading}
-                  data-ocid="payment.confirm_button"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />{" "}
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <IndianRupee className="w-4 h-4 mr-2" /> Pay{" "}
+                  <div>
+                    <p className="text-xs text-muted-foreground line-through">
+                      {formatCurrency(challan.fineAmount)}
+                    </p>
+                    <p className="font-display font-bold text-xl text-primary">
                       {formatCurrency(challan.discountedAmount)}
-                    </>
-                  )}
-                </Button>
+                    </p>
+                  </div>
+                  <Badge className="bg-green-600 hover:bg-green-600 text-white text-xs font-bold">
+                    {discountPct}% OFF
+                  </Badge>
+                </div>
               </div>
+
+              {/* UPI ID display */}
+              {upiLoading ? (
+                <div className="flex items-center gap-2 py-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    Loading payment details...
+                  </span>
+                </div>
+              ) : !upiId ? (
+                <div
+                  className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center"
+                  data-ocid="payment.upi_display"
+                >
+                  <AlertCircle className="w-6 h-6 text-amber-500 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-amber-800">
+                    Payment not available at the moment.
+                  </p>
+                  <p className="text-xs text-amber-700 mt-1">
+                    Please contact admin to configure payment.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div
+                    className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3"
+                    data-ocid="payment.upi_display"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
+                        ₹
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide">
+                          Pay via Paytm
+                        </p>
+                        <p className="text-xs text-blue-600">
+                          Send{" "}
+                          <span className="font-bold">
+                            {formatCurrency(challan.discountedAmount)}
+                          </span>{" "}
+                          to this UPI ID
+                        </p>
+                      </div>
+                    </div>
+                    <div className="bg-white border border-blue-200 rounded-lg p-3 flex items-center justify-between gap-2">
+                      <span className="font-mono font-semibold text-foreground text-sm flex-1 truncate">
+                        {upiId}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 shrink-0"
+                        onClick={handleCopyUpi}
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-blue-600">
+                      ⚡ Open Paytm → Pay/Send Money → Enter UPI ID above
+                    </p>
+                  </div>
+
+                  {/* UTR input */}
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="utr-input"
+                      className="text-sm font-semibold text-foreground block"
+                    >
+                      Paste your UTR / Transaction ID
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      After paying, find the UTR number in your Paytm
+                      transaction history and paste it below.
+                    </p>
+                    <Input
+                      id="utr-input"
+                      value={utrInput}
+                      onChange={(e) => setUtrInput(e.target.value)}
+                      placeholder="e.g. 421234567890"
+                      className="font-mono"
+                      data-ocid="payment.utr_input"
+                    />
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={handleClose}
+                      disabled={isSubmitting}
+                      data-ocid="payment.cancel_button"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={handleSubmitUtr}
+                      disabled={isSubmitting || !utrInput.trim()}
+                      data-ocid="payment.submit_button"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        <>
+                          <Shield className="w-4 h-4 mr-2" /> Submit UTR
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -406,7 +517,6 @@ function MainApp() {
   const [vehicleNumber, setVehicleNumber] = useState<string | null>(null);
   const [selectedChallan, setSelectedChallan] = useState<Challan | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
-  const [paidChallanId, setPaidChallanId] = useState<bigint | null>(null);
 
   const {
     data: challans,
@@ -414,7 +524,7 @@ function MainApp() {
     isError,
   } = useGetChallansByVehicle(vehicleNumber);
   const { mutate: seedData, isPending: isSeeding } = useSeedSampleData();
-  const { mutate: payChallan, isPending: isPaying } = usePayChallan();
+  const { mutate: _payChallan } = usePayChallan();
 
   const handleSearch = () => {
     const trimmed = searchInput.trim().toUpperCase();
@@ -423,30 +533,12 @@ function MainApp() {
       return;
     }
     setVehicleNumber(trimmed);
-    setPaidChallanId(null);
   };
 
   const handlePay = (challan: Challan) => {
     setSelectedChallan(challan);
-    setPaidChallanId(null);
     setPaymentOpen(true);
   };
-
-  const handleConfirmPayment = () => {
-    if (!selectedChallan) return;
-    payChallan(selectedChallan.id, {
-      onSuccess: () => {
-        setPaidChallanId(selectedChallan.id);
-        toast.success("Challan paid successfully!");
-      },
-      onError: () => {
-        toast.error("Payment failed. Please try again.");
-      },
-    });
-  };
-
-  const isPaid =
-    selectedChallan !== null && paidChallanId === selectedChallan.id;
 
   return (
     <div className="min-h-screen bg-background">
@@ -454,9 +546,11 @@ function MainApp() {
       <header className="border-b border-border bg-card shadow-xs sticky top-0 z-10">
         <div className="container max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Shield className="w-4 h-4 text-white" />
-            </div>
+            <img
+              src="/assets/uploads/Government-of-India-Logo-Vector-PNG-1.png"
+              alt="Government of India Logo"
+              className="w-10 h-10 object-contain"
+            />
             <div>
               <span className="font-display font-bold text-xl text-foreground tracking-tight">
                 Challan
@@ -809,15 +903,7 @@ function MainApp() {
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()}. Built with ❤️ using{" "}
-            <a
-              href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-              className="underline hover:text-foreground transition-colors"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              caffeine.ai
-            </a>
+            © {new Date().getFullYear()} ChallanPay. All rights reserved.
           </p>
         </div>
       </footer>
@@ -826,13 +912,7 @@ function MainApp() {
       <PaymentModal
         challan={selectedChallan}
         open={paymentOpen}
-        onClose={() => {
-          setPaymentOpen(false);
-          setPaidChallanId(null);
-        }}
-        onConfirm={handleConfirmPayment}
-        isLoading={isPaying}
-        isPaid={isPaid}
+        onClose={() => setPaymentOpen(false)}
       />
 
       <Toaster position="top-right" />
@@ -840,10 +920,26 @@ function MainApp() {
   );
 }
 
-export default function App() {
+function RootRouter() {
+  const [hash, setHash] = useState(() => window.location.hash);
+
+  useEffect(() => {
+    const handleHashChange = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
+  if (hash.startsWith("#/Srikant")) {
+    return <AdminApp />;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <MainApp />
     </QueryClientProvider>
   );
+}
+
+export default function App() {
+  return <RootRouter />;
 }

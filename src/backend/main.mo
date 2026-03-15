@@ -4,7 +4,25 @@ import Iter "mo:core/Iter";
 import Runtime "mo:core/Runtime";
 import Array "mo:core/Array";
 
+
+
 actor {
+  type UtrStatus = {
+    #pending;
+    #approved;
+    #rejected;
+  };
+
+  type UtrRecord = {
+    id : Nat;
+    challanId : Nat;
+    vehicleNumber : Text;
+    amount : Nat;
+    utr : Text;
+    status : UtrStatus;
+    submittedAt : Text;
+  };
+
   type Status = {
     #pending;
     #paid;
@@ -23,7 +41,10 @@ actor {
   };
 
   let challans = Map.empty<Nat, Challan>();
+  let utrRecords = Map.empty<Nat, UtrRecord>();
   var nextId = 1;
+  var nextUtrId = 1 : Nat;
+  var upiId : ?Text = null;
 
   func applyDiscount(amount : Nat) : Nat {
     amount * 70 / 100;
@@ -85,6 +106,97 @@ actor {
     switch (challans.get(id)) {
       case (null) { Runtime.trap("Challan not found") };
       case (?challan) { challan };
+    };
+  };
+
+  public shared ({ caller }) func setUpiId(newUpiId : Text) : async () {
+    upiId := ?newUpiId;
+  };
+
+  public query ({ caller }) func getUpiId() : async ?Text {
+    upiId;
+  };
+
+  public shared ({ caller }) func submitUtr(challanId : Nat, vehicleNumber : Text, amount : Nat, utr : Text, submittedAt : Text) : async Nat {
+    let utrRecord : UtrRecord = {
+      id = nextUtrId;
+      challanId;
+      vehicleNumber;
+      amount;
+      utr;
+      status = #pending;
+      submittedAt;
+    };
+
+    utrRecords.add(nextUtrId, utrRecord);
+    let utrId = nextUtrId;
+    nextUtrId += 1;
+    utrId;
+  };
+
+  public query ({ caller }) func getUtrSubmissions() : async [UtrRecord] {
+    utrRecords.values().toArray();
+  };
+
+  public shared ({ caller }) func approveUtr(utrId : Nat) : async () {
+    switch (utrRecords.get(utrId)) {
+      case (null) { Runtime.trap("UTR not found") };
+      case (?utrRecord) {
+        if (utrRecord.status != #pending) {
+          Runtime.trap("UTR is not pending");
+        };
+
+        let updatedUtr : UtrRecord = {
+          id = utrRecord.id;
+          challanId = utrRecord.challanId;
+          vehicleNumber = utrRecord.vehicleNumber;
+          amount = utrRecord.amount;
+          utr = utrRecord.utr;
+          status = #approved;
+          submittedAt = utrRecord.submittedAt;
+        };
+        utrRecords.add(utrId, updatedUtr);
+
+        switch (challans.get(utrRecord.challanId)) {
+          case (null) { Runtime.trap("Challan not found") };
+          case (?challan) {
+            let updatedChallan : Challan = {
+              id = challan.id;
+              vehicleNumber = challan.vehicleNumber;
+              violationType = challan.violationType;
+              fineAmount = challan.fineAmount;
+              discountedAmount = challan.discountedAmount;
+              date = challan.date;
+              location = challan.location;
+              status = #paid;
+              officerName = challan.officerName;
+            };
+            challans.add(challan.id, updatedChallan);
+          };
+        };
+      };
+    };
+  };
+
+  public shared ({ caller }) func rejectUtr(utrId : Nat) : async () {
+    switch (utrRecords.get(utrId)) {
+      case (null) { Runtime.trap("UTR not found") };
+      case (?utrRecord) {
+        if (utrRecord.status != #pending) {
+          Runtime.trap("UTR is not pending");
+        };
+
+        let updatedUtr : UtrRecord = {
+          id = utrRecord.id;
+          challanId = utrRecord.challanId;
+          vehicleNumber = utrRecord.vehicleNumber;
+          amount = utrRecord.amount;
+          utr = utrRecord.utr;
+          status = #rejected;
+          submittedAt = utrRecord.submittedAt;
+        };
+        utrRecords.add(utrId, updatedUtr);
+      };
     };
   };
 };

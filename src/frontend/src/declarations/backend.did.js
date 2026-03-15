@@ -20,6 +20,20 @@ export const Challan = IDL.Record({
   'location' : IDL.Text,
   'violationType' : IDL.Text,
 });
+export const UtrStatus = IDL.Variant({
+  'pending' : IDL.Null,
+  'approved' : IDL.Null,
+  'rejected' : IDL.Null,
+});
+export const UtrRecord = IDL.Record({
+  'id' : IDL.Nat,
+  'utr' : IDL.Text,
+  'status' : UtrStatus,
+  'challanId' : IDL.Nat,
+  'vehicleNumber' : IDL.Text,
+  'submittedAt' : IDL.Text,
+  'amount' : IDL.Nat,
+});
 
 export const idlService = IDL.Service({
   'addChallan' : IDL.Func(
@@ -27,10 +41,20 @@ export const idlService = IDL.Service({
       [IDL.Nat],
       [],
     ),
+  'approveUtr' : IDL.Func([IDL.Nat], [], []),
   'getChallan' : IDL.Func([IDL.Nat], [Challan], ['query']),
   'getChallansByVehicle' : IDL.Func([IDL.Text], [IDL.Vec(Challan)], ['query']),
+  'getUpiId' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
+  'getUtrSubmissions' : IDL.Func([], [IDL.Vec(UtrRecord)], ['query']),
   'payChallan' : IDL.Func([IDL.Nat], [], []),
+  'rejectUtr' : IDL.Func([IDL.Nat], [], []),
   'seedSampleData' : IDL.Func([], [], []),
+  'setUpiId' : IDL.Func([IDL.Text], [], []),
+  'submitUtr' : IDL.Func(
+      [IDL.Nat, IDL.Text, IDL.Nat, IDL.Text, IDL.Text],
+      [IDL.Nat],
+      [],
+    ),
 });
 
 export const idlInitArgs = [];
@@ -48,6 +72,20 @@ export const idlFactory = ({ IDL }) => {
     'location' : IDL.Text,
     'violationType' : IDL.Text,
   });
+  const UtrStatus = IDL.Variant({
+    'pending' : IDL.Null,
+    'approved' : IDL.Null,
+    'rejected' : IDL.Null,
+  });
+  const UtrRecord = IDL.Record({
+    'id' : IDL.Nat,
+    'utr' : IDL.Text,
+    'status' : UtrStatus,
+    'challanId' : IDL.Nat,
+    'vehicleNumber' : IDL.Text,
+    'submittedAt' : IDL.Text,
+    'amount' : IDL.Nat,
+  });
   
   return IDL.Service({
     'addChallan' : IDL.Func(
@@ -55,14 +93,24 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat],
         [],
       ),
+    'approveUtr' : IDL.Func([IDL.Nat], [], []),
     'getChallan' : IDL.Func([IDL.Nat], [Challan], ['query']),
     'getChallansByVehicle' : IDL.Func(
         [IDL.Text],
         [IDL.Vec(Challan)],
         ['query'],
       ),
+    'getUpiId' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
+    'getUtrSubmissions' : IDL.Func([], [IDL.Vec(UtrRecord)], ['query']),
     'payChallan' : IDL.Func([IDL.Nat], [], []),
+    'rejectUtr' : IDL.Func([IDL.Nat], [], []),
     'seedSampleData' : IDL.Func([], [], []),
+    'setUpiId' : IDL.Func([IDL.Text], [], []),
+    'submitUtr' : IDL.Func(
+        [IDL.Nat, IDL.Text, IDL.Nat, IDL.Text, IDL.Text],
+        [IDL.Nat],
+        [],
+      ),
   });
 };
 
