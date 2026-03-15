@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Clock,
   Copy,
+  ExternalLink,
   IndianRupee,
   Loader2,
   MapPin,
@@ -42,7 +43,6 @@ import {
   useGetSupportNumber,
   useGetUpiId,
   usePayChallan,
-  useSeedSampleData,
   useSubmitUtr,
 } from "./hooks/useQueries";
 
@@ -569,7 +569,6 @@ function MainApp() {
     isLoading,
     isError,
   } = useGetChallansByVehicle(vehicleNumber);
-  const { mutate: seedData, isPending: isSeeding } = useSeedSampleData();
   const { mutate: _payChallan } = usePayChallan();
 
   // Attempt live API fetch when vehicle number and API config are both set
@@ -687,19 +686,16 @@ function MainApp() {
             >
               <Zap className="w-3 h-3 mr-1 text-amber-500" /> Official Portal
             </Badge>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => seedData()}
-              disabled={isSeeding}
-              className="text-xs text-muted-foreground"
+            <a
+              href="https://mparivahan.in"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors border border-border rounded-md px-3 py-1.5 bg-card hover:bg-muted"
+              data-ocid="header.mparivahan_link"
             >
-              {isSeeding ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                "Load Demo Data"
-              )}
-            </Button>
+              <ExternalLink className="w-3 h-3" />
+              mParivahan
+            </a>
           </div>
         </div>
       </header>
@@ -964,7 +960,7 @@ function MainApp() {
                     </p>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Try loading demo data to see challans.
+                    Check the official portal for more details.
                   </p>
                   {supportNumber && (
                     <div
