@@ -1367,8 +1367,6 @@ function MainApp() {
                       </a>
                     </div>
                   )}
-                  {/* Manual Payment Section */}
-                  <ManualPaymentSection vehicleNumber={vehicleNumber} />
                 </motion.div>
               ) : (
                 <div className="space-y-4" data-ocid="challan.list">
@@ -1403,6 +1401,9 @@ function MainApp() {
                   </div>
                 </motion.div>
               )}
+
+              {/* Manual Payment Section - always visible after results */}
+              <ManualPaymentSection vehicleNumber={vehicleNumber} />
             </>
           )}
 
