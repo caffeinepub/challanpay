@@ -17,6 +17,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   AlertCircle,
   CheckCircle2,
+  Eye,
+  EyeOff,
+  Globe,
+  Key,
   Loader2,
   LogOut,
   Phone,
@@ -31,10 +35,12 @@ import type { UtrRecord } from "./backend.d";
 import { UtrStatus } from "./backend.d";
 import {
   useApproveUtr,
+  useGetApiConfig,
   useGetSupportNumber,
   useGetUpiId,
   useGetUtrSubmissions,
   useRejectUtr,
+  useSetApiConfig,
   useSetSupportNumber,
   useSetUpiId,
 } from "./hooks/useQueries";
@@ -329,6 +335,157 @@ function SupportNumberSettings() {
   );
 }
 
+function ApiSettings() {
+  const { data: currentConfig, isLoading } = useGetApiConfig();
+  const { mutate: setApiConfig, isPending: saving } = useSetApiConfig();
+  const [apiBaseUrl, setApiBaseUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
+
+  const isConfigured = !!(currentConfig?.apiKey && currentConfig?.apiBaseUrl);
+
+  const handleSave = () => {
+    const trimmedUrl = apiBaseUrl.trim();
+    const trimmedKey = apiKey.trim();
+    if (!trimmedUrl) {
+      toast.error("Please enter an API Base URL");
+      return;
+    }
+    if (!trimmedKey) {
+      toast.error("Please enter an API Key");
+      return;
+    }
+    setApiConfig(
+      { apiKey: trimmedKey, apiBaseUrl: trimmedUrl },
+      {
+        onSuccess: () => {
+          toast.success("API configuration saved successfully");
+          setApiBaseUrl("");
+          setApiKey("");
+        },
+        onError: () => toast.error("Failed to save API configuration"),
+      },
+    );
+  };
+
+  const maskedKey = (key: string) =>
+    key.length > 4 ? `${"*".repeat(key.length - 4)}${key.slice(-4)}` : "****";
+
+  return (
+    <Card className="shadow-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="font-display text-lg flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+            <Globe className="w-4 h-4 text-purple-700" />
+          </div>
+          Challan API Configuration
+          <div className="ml-auto">
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            ) : isConfigured ? (
+              <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border border-green-200 text-xs">
+                <CheckCircle2 className="w-3 h-3 mr-1" /> API Configured
+              </Badge>
+            ) : (
+              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border border-amber-200 text-xs">
+                <AlertCircle className="w-3 h-3 mr-1" /> Using Demo Data
+              </Badge>
+            )}
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!isLoading && isConfigured && (
+          <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+            <div>
+              <p className="text-xs text-muted-foreground mb-0.5">
+                API Base URL
+              </p>
+              <p className="font-mono text-sm font-semibold text-foreground break-all">
+                {currentConfig?.apiBaseUrl}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-0.5">API Key</p>
+              <p className="font-mono text-sm font-semibold text-foreground">
+                {maskedKey(currentConfig?.apiKey ?? "")}
+              </p>
+            </div>
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Once configured, live challan data will be used instead of demo data.
+        </p>
+        <Separator />
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <Label
+              htmlFor="api-base-url"
+              className="text-sm font-semibold text-foreground flex items-center gap-1.5"
+            >
+              <Globe className="w-3.5 h-3.5 text-muted-foreground" />
+              API Base URL
+            </Label>
+            <Input
+              id="api-base-url"
+              value={apiBaseUrl}
+              onChange={(e) => setApiBaseUrl(e.target.value)}
+              placeholder="e.g. https://api.example.com/v1"
+              className="font-mono"
+              data-ocid="admin.api_base_url.input"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label
+              htmlFor="api-key"
+              className="text-sm font-semibold text-foreground flex items-center gap-1.5"
+            >
+              <Key className="w-3.5 h-3.5 text-muted-foreground" />
+              API Key
+            </Label>
+            <div className="relative">
+              <Input
+                id="api-key"
+                type={showKey ? "text" : "password"}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="Enter your API key"
+                className="font-mono pr-10"
+                data-ocid="admin.api_key.input"
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                tabIndex={-1}
+              >
+                {showKey ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+          </div>
+          <Button
+            onClick={handleSave}
+            disabled={saving || !apiBaseUrl.trim() || !apiKey.trim()}
+            className="gap-1.5 w-full"
+            data-ocid="admin.api_save_button"
+          >
+            {saving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            {saving ? "Saving..." : "Save API Configuration"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function PaymentRequests() {
   const { data: submissions, isLoading, isError } = useGetUtrSubmissions();
 
@@ -467,7 +624,8 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             Admin Dashboard
           </h1>
           <p className="text-sm text-muted-foreground">
-            Manage UPI settings, support number, and review payment submissions.
+            Manage UPI settings, support number, API configuration, and review
+            payment submissions.
           </p>
         </motion.div>
 
@@ -491,6 +649,14 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.4 }}
+        >
+          <ApiSettings />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.4 }}
         >
           <PaymentRequests />
         </motion.div>
