@@ -24,21 +24,29 @@ import {
   Loader2,
   LogOut,
   Phone,
+  Plus,
   Save,
   Shield,
+  Trash2,
   XCircle,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { UtrRecord } from "./backend.d";
+import type { ManualPaymentRecord, UtrRecord } from "./backend.d";
 import { UtrStatus } from "./backend.d";
 import {
+  useAddViolationType,
+  useApproveManualPayment,
   useApproveUtr,
+  useDeleteViolationType,
   useGetApiConfig,
+  useGetManualPayments,
   useGetSupportNumber,
   useGetUpiId,
   useGetUtrSubmissions,
+  useGetViolationTypes,
+  useRejectManualPayment,
   useRejectUtr,
   useSetApiConfig,
   useSetSupportNumber,
@@ -486,6 +494,318 @@ function ApiSettings() {
   );
 }
 
+function ViolationManager() {
+  const { data: violations, isLoading } = useGetViolationTypes();
+  const { mutate: addViolation, isPending: adding } = useAddViolationType();
+  const { mutate: deleteViolation } = useDeleteViolationType();
+  const [nameInput, setNameInput] = useState("");
+  const [amountInput, setAmountInput] = useState("");
+
+  const handleAdd = () => {
+    const name = nameInput.trim();
+    const amount = Number(amountInput.trim());
+    if (!name) {
+      toast.error("Please enter a violation name");
+      return;
+    }
+    if (!amountInput.trim() || Number.isNaN(amount) || amount <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+    addViolation(
+      { name, amount: BigInt(Math.round(amount)) },
+      {
+        onSuccess: () => {
+          toast.success("Violation type added");
+          setNameInput("");
+          setAmountInput("");
+        },
+        onError: () => toast.error("Failed to add violation"),
+      },
+    );
+  };
+
+  const handleDelete = (id: bigint) => {
+    deleteViolation(id, {
+      onSuccess: () => toast.success("Violation type deleted"),
+      onError: () => toast.error("Failed to delete violation"),
+    });
+  };
+
+  return (
+    <Card className="shadow-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="font-display text-lg flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+            <AlertCircle className="w-4 h-4 text-orange-700" />
+          </div>
+          Violation Manager
+          {violations && violations.length > 0 && (
+            <Badge variant="outline" className="ml-auto text-xs">
+              {violations.length} types
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <div className="flex items-center gap-2 py-4">
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Loading...</span>
+          </div>
+        ) : !violations || violations.length === 0 ? (
+          <div
+            className="flex flex-col items-center py-8 gap-2 text-center"
+            data-ocid="admin.violation.empty_state"
+          >
+            <AlertCircle className="w-8 h-8 text-muted-foreground" />
+            <p className="text-sm font-semibold text-foreground">
+              No violations configured
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Add violation types below to let users select them during manual
+              payment.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2" data-ocid="admin.violation.list">
+            {violations.map((v, i) => (
+              <div
+                key={v.id.toString()}
+                className="flex items-center justify-between bg-muted/40 border border-border rounded-lg px-4 py-2.5"
+                data-ocid={`admin.violation.item.${i + 1}`}
+              >
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    {v.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatCurrency(v.amount)}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-red-50"
+                  onClick={() => handleDelete(v.id)}
+                  data-ocid={`admin.violation.delete_button.${i + 1}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <Separator />
+
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-foreground">
+            Add New Violation
+          </p>
+          <div className="flex gap-2">
+            <Input
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              placeholder="Violation name e.g. Signal Jump"
+              className="flex-1"
+              data-ocid="admin.violation.name.input"
+            />
+            <Input
+              value={amountInput}
+              onChange={(e) => setAmountInput(e.target.value)}
+              placeholder="Amount (₹)"
+              type="number"
+              min="1"
+              className="w-32"
+              data-ocid="admin.violation.amount.input"
+            />
+            <Button
+              onClick={handleAdd}
+              disabled={adding || !nameInput.trim() || !amountInput.trim()}
+              className="gap-1.5 shrink-0"
+              data-ocid="admin.violation.add_button"
+            >
+              {adding ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
+              Add
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ManualPaymentRequests() {
+  const { data: payments, isLoading, isError } = useGetManualPayments();
+  const { mutate: approve } = useApproveManualPayment();
+  const { mutate: reject } = useRejectManualPayment();
+
+  return (
+    <Card className="shadow-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="font-display text-lg flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+            <Shield className="w-4 h-4 text-indigo-700" />
+          </div>
+          Manual Payment Requests
+          {payments && payments.length > 0 && (
+            <Badge variant="outline" className="ml-auto text-xs">
+              {payments.filter((p) => p.status === UtrStatus.pending).length}{" "}
+              pending
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading && (
+          <div
+            className="flex items-center justify-center py-12 gap-3"
+            data-ocid="admin.manual.loading_state"
+          >
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            <span className="text-muted-foreground">Loading...</span>
+          </div>
+        )}
+        {isError && (
+          <div
+            className="flex flex-col items-center py-12 gap-2"
+            data-ocid="admin.manual.error_state"
+          >
+            <AlertCircle className="w-8 h-8 text-destructive" />
+            <p className="text-sm text-muted-foreground">
+              Failed to load manual payments
+            </p>
+          </div>
+        )}
+        {!isLoading &&
+          !isError &&
+          payments !== undefined &&
+          payments.length === 0 && (
+            <div
+              className="flex flex-col items-center py-16 gap-3 text-center"
+              data-ocid="admin.manual.empty_state"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <p className="font-semibold text-foreground">
+                No manual payment requests yet
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Manual payment submissions from users will appear here.
+              </p>
+            </div>
+          )}
+        {!isLoading &&
+          !isError &&
+          payments !== undefined &&
+          payments.length > 0 && (
+            <div className="overflow-x-auto" data-ocid="admin.manual.table">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Vehicle No.</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Violations</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>UTR</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {payments.map((record: ManualPaymentRecord, i: number) => {
+                    const isPending = record.status === UtrStatus.pending;
+                    return (
+                      <TableRow
+                        key={record.id.toString()}
+                        data-ocid={`admin.manual.item.${i + 1}`}
+                      >
+                        <TableCell className="font-mono text-xs font-medium">
+                          {record.vehicleNumber}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {record.phone}
+                        </TableCell>
+                        <TableCell className="text-xs max-w-[200px] truncate">
+                          {record.violations}
+                        </TableCell>
+                        <TableCell className="font-semibold text-sm">
+                          {formatCurrency(record.totalAmount)}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {record.utr}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {new Date(record.submittedAt).toLocaleDateString(
+                            "en-IN",
+                            {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            },
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={record.status} />
+                        </TableCell>
+                        <TableCell>
+                          {isPending && (
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-3 text-xs text-green-700 border-green-200 hover:bg-green-50 hover:text-green-800"
+                                onClick={() =>
+                                  approve(record.id, {
+                                    onSuccess: () =>
+                                      toast.success("Payment approved"),
+                                    onError: () =>
+                                      toast.error("Failed to approve"),
+                                  })
+                                }
+                                data-ocid={`admin.manual.approve_button.${i + 1}`}
+                              >
+                                <CheckCircle2 className="w-3 h-3 mr-1" />{" "}
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-3 text-xs text-red-700 border-red-200 hover:bg-red-50 hover:text-red-800"
+                                onClick={() =>
+                                  reject(record.id, {
+                                    onSuccess: () =>
+                                      toast.success("Payment rejected"),
+                                    onError: () =>
+                                      toast.error("Failed to reject"),
+                                  })
+                                }
+                                data-ocid={`admin.manual.reject_button.${i + 1}`}
+                              >
+                                <XCircle className="w-3 h-3 mr-1" /> Reject
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function PaymentRequests() {
   const { data: submissions, isLoading, isError } = useGetUtrSubmissions();
 
@@ -496,7 +816,7 @@ function PaymentRequests() {
           <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
             <AlertCircle className="w-4 h-4 text-amber-700" />
           </div>
-          Payment Requests
+          UTR Submissions
           {submissions && submissions.length > 0 && (
             <Badge variant="outline" className="ml-auto text-xs">
               {submissions.filter((s) => s.status === UtrStatus.pending).length}{" "}
@@ -624,8 +944,8 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             Admin Dashboard
           </h1>
           <p className="text-sm text-muted-foreground">
-            Manage UPI settings, support number, API configuration, and review
-            payment submissions.
+            Manage UPI settings, support number, API configuration, violations,
+            and review payment submissions.
           </p>
         </motion.div>
 
@@ -656,7 +976,23 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35, duration: 0.4 }}
+        >
+          <ViolationManager />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, duration: 0.4 }}
+        >
+          <ManualPaymentRequests />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45, duration: 0.4 }}
         >
           <PaymentRequests />
         </motion.div>

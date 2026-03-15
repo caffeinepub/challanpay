@@ -25,6 +25,16 @@ export const UtrStatus = IDL.Variant({
   'approved' : IDL.Null,
   'rejected' : IDL.Null,
 });
+export const ManualPaymentRecord = IDL.Record({
+  'id' : IDL.Nat,
+  'utr' : IDL.Text,
+  'status' : UtrStatus,
+  'vehicleNumber' : IDL.Text,
+  'violations' : IDL.Text,
+  'submittedAt' : IDL.Text,
+  'totalAmount' : IDL.Nat,
+  'phone' : IDL.Text,
+});
 export const UtrRecord = IDL.Record({
   'id' : IDL.Nat,
   'utr' : IDL.Text,
@@ -34,6 +44,11 @@ export const UtrRecord = IDL.Record({
   'submittedAt' : IDL.Text,
   'amount' : IDL.Nat,
 });
+export const ViolationType = IDL.Record({
+  'id' : IDL.Nat,
+  'name' : IDL.Text,
+  'amount' : IDL.Nat,
+});
 
 export const idlService = IDL.Service({
   'addChallan' : IDL.Func(
@@ -41,15 +56,39 @@ export const idlService = IDL.Service({
       [IDL.Nat],
       [],
     ),
+  'addViolationType' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Nat], []),
+  'approveManualPayment' : IDL.Func([IDL.Nat], [], []),
   'approveUtr' : IDL.Func([IDL.Nat], [], []),
+  'deleteViolationType' : IDL.Func([IDL.Nat], [], []),
+  'getApiConfig' : IDL.Func(
+      [],
+      [
+        IDL.Record({
+          'apiKey' : IDL.Opt(IDL.Text),
+          'apiBaseUrl' : IDL.Opt(IDL.Text),
+        }),
+      ],
+      ['query'],
+    ),
   'getChallan' : IDL.Func([IDL.Nat], [Challan], ['query']),
   'getChallansByVehicle' : IDL.Func([IDL.Text], [IDL.Vec(Challan)], ['query']),
+  'getManualPayments' : IDL.Func([], [IDL.Vec(ManualPaymentRecord)], ['query']),
+  'getSupportNumber' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
   'getUpiId' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
   'getUtrSubmissions' : IDL.Func([], [IDL.Vec(UtrRecord)], ['query']),
+  'getViolationTypes' : IDL.Func([], [IDL.Vec(ViolationType)], ['query']),
   'payChallan' : IDL.Func([IDL.Nat], [], []),
+  'rejectManualPayment' : IDL.Func([IDL.Nat], [], []),
   'rejectUtr' : IDL.Func([IDL.Nat], [], []),
   'seedSampleData' : IDL.Func([], [], []),
+  'setApiConfig' : IDL.Func([IDL.Text, IDL.Text], [], []),
+  'setSupportNumber' : IDL.Func([IDL.Text], [], []),
   'setUpiId' : IDL.Func([IDL.Text], [], []),
+  'submitManualPayment' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text, IDL.Nat, IDL.Text, IDL.Text],
+      [IDL.Nat],
+      [],
+    ),
   'submitUtr' : IDL.Func(
       [IDL.Nat, IDL.Text, IDL.Nat, IDL.Text, IDL.Text],
       [IDL.Nat],
@@ -77,6 +116,16 @@ export const idlFactory = ({ IDL }) => {
     'approved' : IDL.Null,
     'rejected' : IDL.Null,
   });
+  const ManualPaymentRecord = IDL.Record({
+    'id' : IDL.Nat,
+    'utr' : IDL.Text,
+    'status' : UtrStatus,
+    'vehicleNumber' : IDL.Text,
+    'violations' : IDL.Text,
+    'submittedAt' : IDL.Text,
+    'totalAmount' : IDL.Nat,
+    'phone' : IDL.Text,
+  });
   const UtrRecord = IDL.Record({
     'id' : IDL.Nat,
     'utr' : IDL.Text,
@@ -86,6 +135,11 @@ export const idlFactory = ({ IDL }) => {
     'submittedAt' : IDL.Text,
     'amount' : IDL.Nat,
   });
+  const ViolationType = IDL.Record({
+    'id' : IDL.Nat,
+    'name' : IDL.Text,
+    'amount' : IDL.Nat,
+  });
   
   return IDL.Service({
     'addChallan' : IDL.Func(
@@ -93,19 +147,47 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat],
         [],
       ),
+    'addViolationType' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Nat], []),
+    'approveManualPayment' : IDL.Func([IDL.Nat], [], []),
     'approveUtr' : IDL.Func([IDL.Nat], [], []),
+    'deleteViolationType' : IDL.Func([IDL.Nat], [], []),
+    'getApiConfig' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'apiKey' : IDL.Opt(IDL.Text),
+            'apiBaseUrl' : IDL.Opt(IDL.Text),
+          }),
+        ],
+        ['query'],
+      ),
     'getChallan' : IDL.Func([IDL.Nat], [Challan], ['query']),
     'getChallansByVehicle' : IDL.Func(
         [IDL.Text],
         [IDL.Vec(Challan)],
         ['query'],
       ),
+    'getManualPayments' : IDL.Func(
+        [],
+        [IDL.Vec(ManualPaymentRecord)],
+        ['query'],
+      ),
+    'getSupportNumber' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
     'getUpiId' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
     'getUtrSubmissions' : IDL.Func([], [IDL.Vec(UtrRecord)], ['query']),
+    'getViolationTypes' : IDL.Func([], [IDL.Vec(ViolationType)], ['query']),
     'payChallan' : IDL.Func([IDL.Nat], [], []),
+    'rejectManualPayment' : IDL.Func([IDL.Nat], [], []),
     'rejectUtr' : IDL.Func([IDL.Nat], [], []),
     'seedSampleData' : IDL.Func([], [], []),
+    'setApiConfig' : IDL.Func([IDL.Text, IDL.Text], [], []),
+    'setSupportNumber' : IDL.Func([IDL.Text], [], []),
     'setUpiId' : IDL.Func([IDL.Text], [], []),
+    'submitManualPayment' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, IDL.Nat, IDL.Text, IDL.Text],
+        [IDL.Nat],
+        [],
+      ),
     'submitUtr' : IDL.Func(
         [IDL.Nat, IDL.Text, IDL.Nat, IDL.Text, IDL.Text],
         [IDL.Nat],

@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Challan, UtrRecord, backendInterface } from "../backend.d";
+import type {
+  Challan,
+  ManualPaymentRecord,
+  UtrRecord,
+  ViolationType,
+  backendInterface,
+} from "../backend.d";
 import { useActor } from "./useActor";
 
 export function useGetChallansByVehicle(vehicleNumber: string | null) {
@@ -163,10 +169,13 @@ export function useSetSupportNumber() {
 
 export function useGetApiConfig() {
   const { actor, isFetching } = useActor();
-  return useQuery<{ apiKey: string | null; apiBaseUrl: string | null }>({
+  return useQuery<{
+    apiKey?: string;
+    apiBaseUrl?: string;
+  }>({
     queryKey: ["apiConfig"],
     queryFn: async () => {
-      if (!actor) return { apiKey: null, apiBaseUrl: null };
+      if (!actor) return {};
       return (actor as unknown as backendInterface).getApiConfig();
     },
     enabled: !!actor && !isFetching,
@@ -186,6 +195,117 @@ export function useSetApiConfig() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["apiConfig"] });
+    },
+  });
+}
+
+export function useGetViolationTypes() {
+  const { actor, isFetching } = useActor();
+  return useQuery<ViolationType[]>({
+    queryKey: ["violationTypes"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return (actor as unknown as backendInterface).getViolationTypes();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useAddViolationType() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { name: string; amount: bigint }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as unknown as backendInterface).addViolationType(
+        params.name,
+        params.amount,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["violationTypes"] });
+    },
+  });
+}
+
+export function useDeleteViolationType() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: bigint) => {
+      if (!actor) throw new Error("Actor not available");
+      await (actor as unknown as backendInterface).deleteViolationType(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["violationTypes"] });
+    },
+  });
+}
+
+export function useSubmitManualPayment() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      vehicleNumber: string;
+      phone: string;
+      violations: string;
+      totalAmount: bigint;
+      utr: string;
+      submittedAt: string;
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as unknown as backendInterface).submitManualPayment(
+        params.vehicleNumber,
+        params.phone,
+        params.violations,
+        params.totalAmount,
+        params.utr,
+        params.submittedAt,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["manualPayments"] });
+    },
+  });
+}
+
+export function useGetManualPayments() {
+  const { actor, isFetching } = useActor();
+  return useQuery<ManualPaymentRecord[]>({
+    queryKey: ["manualPayments"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return (actor as unknown as backendInterface).getManualPayments();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useApproveManualPayment() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: bigint) => {
+      if (!actor) throw new Error("Actor not available");
+      await (actor as unknown as backendInterface).approveManualPayment(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["manualPayments"] });
+    },
+  });
+}
+
+export function useRejectManualPayment() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: bigint) => {
+      if (!actor) throw new Error("Actor not available");
+      await (actor as unknown as backendInterface).rejectManualPayment(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["manualPayments"] });
     },
   });
 }

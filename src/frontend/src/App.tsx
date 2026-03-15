@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +17,7 @@ import {
   Calendar,
   Car,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   Clock,
   Copy,
@@ -27,6 +29,7 @@ import {
   Radio,
   Search,
   Shield,
+  Smartphone,
   Tag,
   User,
   Zap,
@@ -42,7 +45,9 @@ import {
   useGetChallansByVehicle,
   useGetSupportNumber,
   useGetUpiId,
+  useGetViolationTypes,
   usePayChallan,
+  useSubmitManualPayment,
   useSubmitUtr,
 } from "./hooks/useQueries";
 
@@ -104,6 +109,92 @@ function mapApiResponseToChallan(
   };
 }
 
+function UpiPayButton({
+  upiId,
+  amount,
+  note,
+}: {
+  upiId: string;
+  amount: number | bigint;
+  note?: string;
+}) {
+  const [showFallback, setShowFallback] = useState(false);
+  const amountNum = Number(amount);
+  const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&am=${amountNum}&cu=INR&tn=${encodeURIComponent(note || "ChallanPay")}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(`upi://pay?pa=${upiId}&am=${amountNum}&cu=INR`)}&size=200x200`;
+
+  const handlePayNow = () => {
+    window.location.href = upiLink;
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(upiId);
+    toast.success("UPI ID copied!");
+  };
+
+  return (
+    <div className="space-y-3">
+      <Button
+        className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold"
+        onClick={handlePayNow}
+        data-ocid="payment.upi_deeplink_button"
+      >
+        <Smartphone className="w-4 h-4" />
+        Pay via UPI Apps
+        <span className="text-xs opacity-80 font-normal ml-1">
+          ({formatCurrency(BigInt(amountNum))})
+        </span>
+      </Button>
+
+      <button
+        type="button"
+        className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1"
+        onClick={() => setShowFallback((v) => !v)}
+      >
+        <ChevronDown
+          className={`w-3 h-3 transition-transform ${showFallback ? "rotate-180" : ""}`}
+        />
+        {showFallback ? "Hide" : "Can't open app? Show QR / copy UPI ID"}
+      </button>
+
+      {showFallback && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          className="bg-muted/40 border border-border rounded-xl p-4 space-y-3"
+        >
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Scan to Pay
+            </p>
+            <img
+              src={qrUrl}
+              alt="UPI QR Code"
+              className="w-40 h-40 rounded-lg border border-border"
+              data-ocid="payment.upi_qr_code"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2 bg-background border border-border rounded-lg px-3 py-2">
+            <span className="font-mono text-sm text-foreground truncate flex-1">
+              {upiId}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-primary hover:text-primary shrink-0"
+              onClick={handleCopy}
+              data-ocid="payment.upi_copy_button"
+            >
+              <Copy className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
 function PaymentModal({
   challan,
   open,
@@ -159,13 +250,6 @@ function PaymentModal({
         },
       },
     );
-  };
-
-  const handleCopyUpi = () => {
-    if (upiId) {
-      navigator.clipboard.writeText(upiId);
-      toast.success("UPI ID copied!");
-    }
   };
 
   return (
@@ -289,44 +373,11 @@ function PaymentModal({
                 </div>
               ) : (
                 <>
-                  <div
-                    className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3"
-                    data-ocid="payment.upi_display"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
-                        ₹
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide">
-                          Pay via Paytm
-                        </p>
-                        <p className="text-xs text-blue-600">
-                          Send{" "}
-                          <span className="font-bold">
-                            {formatCurrency(challan.discountedAmount)}
-                          </span>{" "}
-                          to this UPI ID
-                        </p>
-                      </div>
-                    </div>
-                    <div className="bg-white border border-blue-200 rounded-lg p-3 flex items-center justify-between gap-2">
-                      <span className="font-mono font-semibold text-foreground text-sm flex-1 truncate">
-                        {upiId}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 shrink-0"
-                        onClick={handleCopyUpi}
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                    <p className="text-xs text-blue-600">
-                      ⚡ Open Paytm → Pay/Send Money → Enter UPI ID above
-                    </p>
-                  </div>
+                  <UpiPayButton
+                    upiId={upiId}
+                    amount={challan.discountedAmount}
+                    note={`ChallanPay - ${challan.vehicleNumber}`}
+                  />
 
                   {/* UTR input */}
                   <div className="space-y-2">
@@ -385,6 +436,343 @@ function PaymentModal({
         </AnimatePresence>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ManualPaymentSection({ vehicleNumber }: { vehicleNumber: string }) {
+  const { data: violations, isLoading: violationsLoading } =
+    useGetViolationTypes();
+  const { data: upiId } = useGetUpiId();
+  const { mutate: submitManual, isPending: isSubmitting } =
+    useSubmitManualPayment();
+
+  const [phone, setPhone] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [utrInput, setUtrInput] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  const toggleViolation = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectedViolations = (violations ?? []).filter((v) =>
+    selectedIds.has(v.id.toString()),
+  );
+  const rawTotal = selectedViolations.reduce((acc, v) => acc + v.amount, 0n);
+  const discountedTotal = BigInt(Math.round(Number(rawTotal) * 0.7));
+
+  const canProceed = phone.trim().length >= 10 && selectedIds.size > 0;
+
+  const handleSubmit = () => {
+    const trimmedUtr = utrInput.trim();
+    if (!trimmedUtr || trimmedUtr.length < 6) {
+      toast.error("Please enter a valid UTR number");
+      return;
+    }
+    const violationNames = selectedViolations.map((v) => v.name).join(", ");
+    submitManual(
+      {
+        vehicleNumber,
+        phone: phone.trim(),
+        violations: violationNames,
+        totalAmount: discountedTotal,
+        utr: trimmedUtr,
+        submittedAt: new Date().toISOString(),
+      },
+      {
+        onSuccess: () => {
+          setSubmitted(true);
+          toast.success("Manual payment submitted for review!");
+        },
+        onError: () => toast.error("Submission failed. Please try again."),
+      },
+    );
+  };
+
+  const handleClose = () => {
+    setDialogOpen(false);
+    setUtrInput("");
+    setSubmitted(false);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1 }}
+      className="w-full mt-6"
+      data-ocid="manual.section"
+    >
+      <div className="flex items-center gap-3 mb-4">
+        <Separator className="flex-1" />
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0">
+          Know your violation? Pay manually
+        </span>
+        <Separator className="flex-1" />
+      </div>
+
+      <div className="bg-muted/40 border border-border rounded-xl p-5 space-y-4">
+        {/* Phone */}
+        <div className="space-y-1.5">
+          <label
+            htmlFor="manual-phone"
+            className="text-sm font-semibold text-foreground flex items-center gap-1.5"
+          >
+            <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+            Your Phone Number
+          </label>
+          <Input
+            id="manual-phone"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="e.g. 9876543210"
+            className="max-w-xs"
+            data-ocid="manual.phone.input"
+          />
+        </div>
+
+        {/* Violations */}
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-foreground">
+            Select Violation(s)
+          </p>
+          {violationsLoading ? (
+            <div className="flex items-center gap-2 py-2">
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                Loading violations...
+              </span>
+            </div>
+          ) : !violations || violations.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic">
+              Violations not configured yet. Please contact admin.
+            </p>
+          ) : (
+            <div className="grid gap-2">
+              {violations.map((v, i) => (
+                <label
+                  key={v.id.toString()}
+                  htmlFor={`violation-${v.id}`}
+                  className="flex items-center justify-between gap-3 bg-background border border-border rounded-lg px-4 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      id={`violation-${v.id}`}
+                      checked={selectedIds.has(v.id.toString())}
+                      onCheckedChange={() => toggleViolation(v.id.toString())}
+                      data-ocid={`manual.violation.checkbox.${i + 1}`}
+                    />
+                    <span className="text-sm font-medium text-foreground">
+                      {v.name}
+                    </span>
+                  </div>
+                  <span className="text-sm font-semibold text-muted-foreground shrink-0">
+                    {formatCurrency(v.amount)}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Total */}
+        {selectedIds.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            className="bg-background border border-border rounded-lg px-4 py-3 flex items-center justify-between"
+            data-ocid="manual.total.panel"
+          >
+            <div>
+              <p className="text-xs text-muted-foreground">
+                {selectedIds.size} violation{selectedIds.size > 1 ? "s" : ""}{" "}
+                selected
+              </p>
+              <p className="text-xs text-muted-foreground line-through">
+                {formatCurrency(rawTotal)}
+              </p>
+              <p className="font-display font-bold text-lg text-primary">
+                {formatCurrency(discountedTotal)}
+              </p>
+            </div>
+            <Badge className="bg-green-600 hover:bg-green-600 text-white text-xs font-bold">
+              30% OFF
+            </Badge>
+          </motion.div>
+        )}
+
+        <Button
+          className="w-full gap-2"
+          disabled={!canProceed}
+          onClick={() => setDialogOpen(true)}
+          data-ocid="manual.proceed.primary_button"
+        >
+          <IndianRupee className="w-4 h-4" />
+          Proceed to Pay
+        </Button>
+      </div>
+
+      {/* Manual Payment Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={(v) => !v && handleClose()}>
+        <DialogContent className="max-w-md" data-ocid="manual.payment.dialog">
+          <AnimatePresence mode="wait">
+            {submitted ? (
+              <motion.div
+                key="success"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex flex-col items-center py-8 gap-4"
+                data-ocid="manual.success_state"
+              >
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 260,
+                    damping: 20,
+                    delay: 0.1,
+                  }}
+                  className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center"
+                >
+                  <CheckCircle2 className="w-10 h-10 text-success" />
+                </motion.div>
+                <div className="text-center">
+                  <h3 className="font-display font-bold text-2xl text-foreground mb-1">
+                    Submitted!
+                  </h3>
+                  <p className="text-muted-foreground text-sm">
+                    Your payment will be reviewed shortly.
+                  </p>
+                </div>
+                <Button
+                  onClick={handleClose}
+                  className="w-full"
+                  data-ocid="manual.close_button"
+                >
+                  Done
+                </Button>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="payment"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex flex-col gap-5"
+              >
+                <DialogHeader>
+                  <DialogTitle className="font-display text-xl">
+                    Pay via Paytm UPI
+                  </DialogTitle>
+                </DialogHeader>
+
+                {/* Summary */}
+                <div className="bg-muted/60 rounded-xl p-4 space-y-2">
+                  <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">
+                    Violations
+                  </p>
+                  {selectedViolations.map((v) => (
+                    <div
+                      key={v.id.toString()}
+                      className="flex justify-between text-sm"
+                    >
+                      <span className="text-foreground">{v.name}</span>
+                      <span className="text-muted-foreground line-through">
+                        {formatCurrency(v.amount)}
+                      </span>
+                    </div>
+                  ))}
+                  <Separator />
+                  <div className="flex justify-between items-center">
+                    <p className="font-display font-bold text-lg text-primary">
+                      {formatCurrency(discountedTotal)}
+                    </p>
+                    <Badge className="bg-green-600 hover:bg-green-600 text-white text-xs font-bold">
+                      30% OFF
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* UPI */}
+                {!upiId ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+                    <AlertCircle className="w-6 h-6 text-amber-500 mx-auto mb-2" />
+                    <p className="text-sm font-semibold text-amber-800">
+                      Payment not configured.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <UpiPayButton
+                      upiId={upiId}
+                      amount={discountedTotal}
+                      note={`ChallanPay Manual - ${vehicleNumber}`}
+                    />
+
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="manual-utr"
+                        className="text-sm font-semibold text-foreground block"
+                      >
+                        Paste your UTR / Transaction ID
+                      </label>
+                      <Input
+                        id="manual-utr"
+                        value={utrInput}
+                        onChange={(e) => setUtrInput(e.target.value)}
+                        placeholder="e.g. 421234567890"
+                        className="font-mono"
+                        data-ocid="manual.utr.input"
+                      />
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        onClick={handleClose}
+                        disabled={isSubmitting}
+                        data-ocid="manual.cancel_button"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        className="flex-1"
+                        onClick={handleSubmit}
+                        disabled={isSubmitting || !utrInput.trim()}
+                        data-ocid="manual.submit.primary_button"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Submitting...
+                          </>
+                        ) : (
+                          <>
+                            <Shield className="w-4 h-4 mr-2" />
+                            Submit UTR
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </DialogContent>
+      </Dialog>
+    </motion.div>
   );
 }
 
@@ -667,10 +1055,10 @@ function MainApp() {
             />
             <div>
               <span className="font-display font-bold text-xl text-foreground tracking-tight">
-                Challan
+                ChallanPay
               </span>
-              <span className="font-display font-bold text-xl text-primary tracking-tight">
-                Pay
+              <span className="font-display font-bold text-xl text-muted-foreground tracking-tight">
+                {" | NPCI"}
               </span>
             </div>
           </div>
@@ -944,7 +1332,7 @@ function MainApp() {
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="flex flex-col items-center py-20 gap-4"
+                  className="flex flex-col items-center py-12 gap-4"
                   data-ocid="challan.empty_state"
                 >
                   <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center">
@@ -964,7 +1352,7 @@ function MainApp() {
                   </p>
                   {supportNumber && (
                     <div
-                      className="mt-4 flex flex-col items-center gap-2"
+                      className="flex flex-col items-center gap-2"
                       data-ocid="challan.support_helpline"
                     >
                       <p className="text-sm text-muted-foreground">
@@ -979,6 +1367,8 @@ function MainApp() {
                       </a>
                     </div>
                   )}
+                  {/* Manual Payment Section */}
+                  <ManualPaymentSection vehicleNumber={vehicleNumber} />
                 </motion.div>
               ) : (
                 <div className="space-y-4" data-ocid="challan.list">

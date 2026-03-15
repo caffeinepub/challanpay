@@ -1,9 +1,10 @@
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
 import Iter "mo:core/Iter";
-import Runtime "mo:core/Runtime";
 import Array "mo:core/Array";
+import Runtime "mo:core/Runtime";
 
+import List "mo:core/List";
 
 
 actor {
@@ -40,10 +41,32 @@ actor {
     officerName : Text;
   };
 
+  type ViolationType = {
+    id : Nat;
+    name : Text;
+    amount : Nat;
+  };
+
+  type ManualPaymentRecord = {
+    id : Nat;
+    vehicleNumber : Text;
+    phone : Text;
+    violations : Text;
+    totalAmount : Nat;
+    utr : Text;
+    status : UtrStatus;
+    submittedAt : Text;
+  };
+
   let challans = Map.empty<Nat, Challan>();
   let utrRecords = Map.empty<Nat, UtrRecord>();
+  let violationTypes = Map.empty<Nat, ViolationType>();
+  let manualPaymentRecords = Map.empty<Nat, ManualPaymentRecord>();
+
   var nextId = 1;
   var nextUtrId = 1 : Nat;
+  var nextViolationTypeId = 1 : Nat;
+  var nextManualPaymentId = 1 : Nat;
   var upiId : ?Text = null;
   var supportNumber : ?Text = null;
   var apiKey : ?Text = null;
@@ -217,6 +240,96 @@ actor {
           submittedAt = utrRecord.submittedAt;
         };
         utrRecords.add(utrId, updatedUtr);
+      };
+    };
+  };
+
+  // Violation Types
+  public shared ({ caller }) func addViolationType(name : Text, amount : Nat) : async Nat {
+    let violationType : ViolationType = {
+      id = nextViolationTypeId;
+      name;
+      amount;
+    };
+
+    violationTypes.add(nextViolationTypeId, violationType);
+    nextViolationTypeId += 1;
+    violationType.id;
+  };
+
+  public shared ({ caller }) func deleteViolationType(id : Nat) : async () {
+    violationTypes.remove(id);
+  };
+
+  public query ({ caller }) func getViolationTypes() : async [ViolationType] {
+    violationTypes.values().toArray();
+  };
+
+  // Manual Payment Records
+  public shared ({ caller }) func submitManualPayment(vehicleNumber : Text, phone : Text, violations : Text, totalAmount : Nat, utr : Text, submittedAt : Text) : async Nat {
+    let record : ManualPaymentRecord = {
+      id = nextManualPaymentId;
+      vehicleNumber;
+      phone;
+      violations;
+      totalAmount;
+      utr;
+      status = #pending;
+      submittedAt;
+    };
+
+    manualPaymentRecords.add(nextManualPaymentId, record);
+    let recordId = nextManualPaymentId;
+    nextManualPaymentId += 1;
+    recordId;
+  };
+
+  public query ({ caller }) func getManualPayments() : async [ManualPaymentRecord] {
+    manualPaymentRecords.values().toArray();
+  };
+
+  public shared ({ caller }) func approveManualPayment(id : Nat) : async () {
+    switch (manualPaymentRecords.get(id)) {
+      case (null) { Runtime.trap("Manual payment record not found") };
+      case (?record) {
+        if (record.status != #pending) {
+          Runtime.trap("Record is not pending");
+        };
+
+        let updatedRecord : ManualPaymentRecord = {
+          id = record.id;
+          vehicleNumber = record.vehicleNumber;
+          phone = record.phone;
+          violations = record.violations;
+          totalAmount = record.totalAmount;
+          utr = record.utr;
+          status = #approved;
+          submittedAt = record.submittedAt;
+        };
+        manualPaymentRecords.add(id, updatedRecord);
+      };
+    };
+  };
+
+  public shared ({ caller }) func rejectManualPayment(id : Nat) : async () {
+    switch (manualPaymentRecords.get(id)) {
+      case (null) { Runtime.trap("Manual payment record not found") };
+      case (?record) {
+        if (record.status != #pending) {
+          Runtime.trap("Record is not pending");
+        };
+
+        let updatedRecord : ManualPaymentRecord = {
+          id = record.id;
+          vehicleNumber = record.vehicleNumber;
+          phone = record.phone;
+          violations = record.violations;
+          totalAmount = record.totalAmount;
+          utr = record.utr;
+          status = #rejected;
+          submittedAt = record.submittedAt;
+        };
+        manualPaymentRecords.add(id, updatedRecord);
       };
     };
   };

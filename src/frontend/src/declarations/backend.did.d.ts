@@ -21,6 +21,16 @@ export interface Challan {
   'location' : string,
   'violationType' : string,
 }
+export interface ManualPaymentRecord {
+  'id' : bigint,
+  'utr' : string,
+  'status' : UtrStatus,
+  'vehicleNumber' : string,
+  'violations' : string,
+  'submittedAt' : string,
+  'totalAmount' : bigint,
+  'phone' : string,
+}
 export type Status = { 'pending' : null } |
   { 'paid' : null };
 export interface UtrRecord {
@@ -35,20 +45,42 @@ export interface UtrRecord {
 export type UtrStatus = { 'pending' : null } |
   { 'approved' : null } |
   { 'rejected' : null };
+export interface ViolationType {
+  'id' : bigint,
+  'name' : string,
+  'amount' : bigint,
+}
 export interface _SERVICE {
   'addChallan' : ActorMethod<
     [string, string, bigint, string, string, string],
     bigint
   >,
+  'addViolationType' : ActorMethod<[string, bigint], bigint>,
+  'approveManualPayment' : ActorMethod<[bigint], undefined>,
   'approveUtr' : ActorMethod<[bigint], undefined>,
+  'deleteViolationType' : ActorMethod<[bigint], undefined>,
+  'getApiConfig' : ActorMethod<
+    [],
+    { 'apiKey' : [] | [string], 'apiBaseUrl' : [] | [string] }
+  >,
   'getChallan' : ActorMethod<[bigint], Challan>,
   'getChallansByVehicle' : ActorMethod<[string], Array<Challan>>,
+  'getManualPayments' : ActorMethod<[], Array<ManualPaymentRecord>>,
+  'getSupportNumber' : ActorMethod<[], [] | [string]>,
   'getUpiId' : ActorMethod<[], [] | [string]>,
   'getUtrSubmissions' : ActorMethod<[], Array<UtrRecord>>,
+  'getViolationTypes' : ActorMethod<[], Array<ViolationType>>,
   'payChallan' : ActorMethod<[bigint], undefined>,
+  'rejectManualPayment' : ActorMethod<[bigint], undefined>,
   'rejectUtr' : ActorMethod<[bigint], undefined>,
   'seedSampleData' : ActorMethod<[], undefined>,
+  'setApiConfig' : ActorMethod<[string, string], undefined>,
+  'setSupportNumber' : ActorMethod<[string], undefined>,
   'setUpiId' : ActorMethod<[string], undefined>,
+  'submitManualPayment' : ActorMethod<
+    [string, string, string, bigint, string, string],
+    bigint
+  >,
   'submitUtr' : ActorMethod<[bigint, string, bigint, string, string], bigint>,
 }
 export declare const idlService: IDL.ServiceClass;
