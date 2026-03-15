@@ -21,9 +21,14 @@ import {
 } from "@/components/ui/table";
 import {
   CheckCircle2,
+  Eye,
+  EyeOff,
+  Globe,
   IndianRupee,
+  Key,
   Loader2,
   Lock,
+  Phone,
   Settings,
   Shield,
   XCircle,
@@ -34,9 +39,13 @@ import { toast } from "sonner";
 import { UtrStatus } from "../backend.d";
 import {
   useApproveUtr,
+  useGetApiConfig,
+  useGetSupportNumber,
   useGetUpiId,
   useGetUtrSubmissions,
   useRejectUtr,
+  useSetApiConfig,
+  useSetSupportNumber,
   useSetUpiId,
 } from "../hooks/useQueries";
 
@@ -76,6 +85,19 @@ function AdminDashboard() {
   const [upiInput, setUpiInput] = useState("");
   const { data: currentUpiId, isLoading: upiLoading } = useGetUpiId();
   const { mutate: setUpiId, isPending: isSavingUpi } = useSetUpiId();
+  const [supportInput, setSupportInput] = useState("");
+  const { data: currentSupportNumber, isLoading: supportLoading } =
+    useGetSupportNumber();
+  const { mutate: setSupportNumber, isPending: isSavingSupport } =
+    useSetSupportNumber();
+
+  // API Config state
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [apiBaseUrlInput, setApiBaseUrlInput] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const { data: apiConfig, isLoading: apiConfigLoading } = useGetApiConfig();
+  const { mutate: setApiConfig, isPending: isSavingApi } = useSetApiConfig();
+
   const { data: utrSubmissions, isLoading: utrLoading } =
     useGetUtrSubmissions();
   const { mutate: approveUtr, isPending: isApproving } = useApproveUtr();
@@ -98,6 +120,45 @@ function AdminDashboard() {
     });
   };
 
+  const handleSaveSupport = () => {
+    const trimmed = supportInput.trim();
+    if (!trimmed) {
+      toast.error("Please enter a valid support number");
+      return;
+    }
+    setSupportNumber(trimmed, {
+      onSuccess: () => {
+        toast.success("Support number saved successfully!");
+        setSupportInput("");
+      },
+      onError: () => {
+        toast.error("Failed to save support number");
+      },
+    });
+  };
+
+  const handleSaveApi = () => {
+    const key = apiKeyInput.trim();
+    const url = apiBaseUrlInput.trim();
+    if (!key || !url) {
+      toast.error("Please enter both API Key and API Base URL");
+      return;
+    }
+    setApiConfig(
+      { apiKey: key, apiBaseUrl: url },
+      {
+        onSuccess: () => {
+          toast.success("API configuration saved!");
+          setApiKeyInput("");
+          setApiBaseUrlInput("");
+        },
+        onError: () => {
+          toast.error("Failed to save API configuration");
+        },
+      },
+    );
+  };
+
   const handleApprove = (utrId: bigint, index: number) => {
     approveUtr(utrId, {
       onSuccess: () => toast.success(`UTR #${index + 1} approved`),
@@ -111,6 +172,8 @@ function AdminDashboard() {
       onError: () => toast.error("Failed to reject UTR"),
     });
   };
+
+  const isApiConfigured = apiConfig?.apiKey && apiConfig?.apiBaseUrl;
 
   return (
     <div className="space-y-6 pb-6">
@@ -177,6 +240,193 @@ function AdminDashboard() {
               </Button>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Support Number Management */}
+      <Card className="border border-border shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Phone className="w-4 h-4 text-primary" />
+            </div>
+            Support Helpline Number
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-muted/60 rounded-lg p-3">
+            <p className="text-xs text-muted-foreground mb-1">
+              Current Support Number
+            </p>
+            {supportLoading ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  Loading...
+                </span>
+              </div>
+            ) : currentSupportNumber ? (
+              <p className="font-mono font-semibold text-foreground text-sm">
+                {currentSupportNumber}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                No support number configured
+              </p>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Label
+                htmlFor="support-input"
+                className="text-xs text-muted-foreground mb-1.5 block"
+              >
+                New Support Number (e.g. 1800-XXX-XXXX)
+              </Label>
+              <Input
+                id="support-input"
+                value={supportInput}
+                onChange={(e) => setSupportInput(e.target.value)}
+                placeholder="Enter support phone number e.g. 1800-XXX-XXXX"
+                data-ocid="admin.support_number.input"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                onClick={handleSaveSupport}
+                disabled={isSavingSupport || !supportInput.trim()}
+                size="sm"
+                className="h-10"
+                data-ocid="admin.support_number.save_button"
+              >
+                {isSavingSupport ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  "Save"
+                )}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* API Configuration */}
+      <Card className="border border-border shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center">
+              <Globe className="w-4 h-4 text-blue-600" />
+            </div>
+            Challan API Configuration
+            {apiConfigLoading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground ml-auto" />
+            ) : (
+              <Badge
+                className={`ml-auto text-xs ${
+                  isApiConfigured
+                    ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-100"
+                    : "bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-100"
+                }`}
+              >
+                {isApiConfigured ? (
+                  <>
+                    <CheckCircle2 className="w-3 h-3 mr-1" /> API Configured
+                  </>
+                ) : (
+                  <>Using Demo Data</>
+                )}
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Configure an external challan API. Once set, live data will be used
+            instead of demo data.
+          </p>
+
+          {isApiConfigured && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-1">
+              <p className="text-xs font-semibold text-green-800">
+                Currently Active
+              </p>
+              <p className="text-xs text-green-700 font-mono truncate">
+                {apiConfig?.apiBaseUrl}
+              </p>
+              <p className="text-xs text-green-600">
+                API Key: ••••••••{apiConfig?.apiKey?.slice(-4)}
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <div>
+              <Label
+                htmlFor="api-base-url"
+                className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5"
+              >
+                <Globe className="w-3 h-3" /> API Base URL
+              </Label>
+              <Input
+                id="api-base-url"
+                value={apiBaseUrlInput}
+                onChange={(e) => setApiBaseUrlInput(e.target.value)}
+                placeholder="https://api.example.com/challans"
+                className="font-mono text-sm"
+                data-ocid="admin.api_base_url.input"
+              />
+            </div>
+            <div>
+              <Label
+                htmlFor="api-key"
+                className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5"
+              >
+                <Key className="w-3 h-3" /> API Key
+              </Label>
+              <div className="relative">
+                <Input
+                  id="api-key"
+                  type={showApiKey ? "text" : "password"}
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  placeholder="Enter your API key"
+                  className="font-mono text-sm pr-10"
+                  data-ocid="admin.api_key.input"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showApiKey ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <Button
+            onClick={handleSaveApi}
+            disabled={
+              isSavingApi || !apiKeyInput.trim() || !apiBaseUrlInput.trim()
+            }
+            size="sm"
+            className="w-full"
+            data-ocid="admin.api_save_button"
+          >
+            {isSavingApi ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" /> Saving...
+              </>
+            ) : (
+              <>
+                <Key className="w-4 h-4 mr-2" /> Save API Configuration
+              </>
+            )}
+          </Button>
         </CardContent>
       </Card>
 

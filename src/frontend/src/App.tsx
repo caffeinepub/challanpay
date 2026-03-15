@@ -22,6 +22,8 @@ import {
   IndianRupee,
   Loader2,
   MapPin,
+  Phone,
+  Radio,
   Search,
   Shield,
   Tag,
@@ -35,7 +37,9 @@ import { AdminApp } from "./AdminApp";
 import type { Challan } from "./backend.d";
 import { Status } from "./backend.d";
 import {
+  useGetApiConfig,
   useGetChallansByVehicle,
+  useGetSupportNumber,
   useGetUpiId,
   usePayChallan,
   useSeedSampleData,
@@ -62,6 +66,42 @@ function getViolationIcon(type: string) {
   if (lower.includes("belt") || lower.includes("seatbelt")) return "🛡️";
   if (lower.includes("phone") || lower.includes("mobile")) return "📱";
   return "⚠️";
+}
+
+// Map flexible API response fields to our Challan type
+function mapApiResponseToChallan(
+  item: Record<string, unknown>,
+  index: number,
+): Challan {
+  const fineAmount = BigInt(
+    Math.round(
+      Number(item.fine_amount ?? item.fineAmount ?? item.amount ?? 500),
+    ),
+  );
+  const discountedAmount = BigInt(Math.round(Number(fineAmount) * 0.7));
+  return {
+    id: BigInt(index + 1),
+    vehicleNumber: String(item.vehicle_number ?? item.vehicleNumber ?? ""),
+    violationType: String(
+      item.violation_type ??
+        item.violationType ??
+        item.violation ??
+        "Traffic Violation",
+    ),
+    fineAmount,
+    discountedAmount,
+    date: String(
+      item.date ?? item.challan_date ?? new Date().toISOString().split("T")[0],
+    ),
+    location: String(item.location ?? item.place ?? "Unknown"),
+    officerName: String(
+      item.officer_name ??
+        item.officerName ??
+        item.officer ??
+        "Traffic Officer",
+    ),
+    status: Status.pending,
+  };
 }
 
 function PaymentModal({
@@ -517,6 +557,12 @@ function MainApp() {
   const [vehicleNumber, setVehicleNumber] = useState<string | null>(null);
   const [selectedChallan, setSelectedChallan] = useState<Challan | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [apiChallans, setApiChallans] = useState<Challan[] | null>(null);
+  const [isApiLoading, setIsApiLoading] = useState(false);
+  const [usingLiveApi, setUsingLiveApi] = useState(false);
+
+  const { data: supportNumber } = useGetSupportNumber();
+  const { data: apiConfig } = useGetApiConfig();
 
   const {
     data: challans,
@@ -525,6 +571,75 @@ function MainApp() {
   } = useGetChallansByVehicle(vehicleNumber);
   const { mutate: seedData, isPending: isSeeding } = useSeedSampleData();
   const { mutate: _payChallan } = usePayChallan();
+
+  // Attempt live API fetch when vehicle number and API config are both set
+  useEffect(() => {
+    if (!vehicleNumber || !apiConfig?.apiKey || !apiConfig?.apiBaseUrl) {
+      setApiChallans(null);
+      setUsingLiveApi(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsApiLoading(true);
+    setApiChallans(null);
+    setUsingLiveApi(false);
+
+    const fetchFromApi = async () => {
+      try {
+        const res = await fetch(`${apiConfig.apiBaseUrl}/${vehicleNumber}`, {
+          headers: {
+            Authorization: `Bearer ${apiConfig.apiKey}`,
+            "X-API-Key": apiConfig.apiKey ?? "",
+            "Content-Type": "application/json",
+          },
+        });
+        if (!res.ok) throw new Error(`API returned ${res.status}`);
+        const data = await res.json();
+        if (cancelled) return;
+        if (Array.isArray(data)) {
+          const mapped = data.map((item, idx) =>
+            mapApiResponseToChallan(item as Record<string, unknown>, idx),
+          );
+          setApiChallans(mapped);
+          setUsingLiveApi(true);
+        } else if (
+          data &&
+          typeof data === "object" &&
+          Array.isArray((data as Record<string, unknown>).challans)
+        ) {
+          const list = (data as Record<string, unknown>).challans as Record<
+            string,
+            unknown
+          >[];
+          const mapped = list.map((item, idx) =>
+            mapApiResponseToChallan(item, idx),
+          );
+          setApiChallans(mapped);
+          setUsingLiveApi(true);
+        } else {
+          // Unexpected format — fall back silently
+          setApiChallans(null);
+          setUsingLiveApi(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setApiChallans(null);
+          setUsingLiveApi(false);
+        }
+      } finally {
+        if (!cancelled) setIsApiLoading(false);
+      }
+    };
+
+    fetchFromApi();
+    return () => {
+      cancelled = true;
+    };
+  }, [vehicleNumber, apiConfig]);
+
+  const displayedChallans = apiChallans ?? challans;
+  const displayLoading = isLoading || isApiLoading;
 
   const handleSearch = () => {
     const trimmed = searchInput.trim().toUpperCase();
@@ -561,6 +676,11 @@ function MainApp() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {usingLiveApi && (
+              <Badge className="text-xs bg-green-100 text-green-700 border-green-300 hover:bg-green-100 hidden sm:flex items-center gap-1">
+                <Radio className="w-3 h-3" /> Live Data
+              </Badge>
+            )}
             <Badge
               variant="outline"
               className="text-xs text-muted-foreground hidden sm:flex"
@@ -637,11 +757,11 @@ function MainApp() {
               />
               <Button
                 onClick={handleSearch}
-                disabled={isLoading}
+                disabled={displayLoading}
                 className="h-12 px-6 rounded-xl font-semibold text-sm gap-2 shrink-0"
                 data-ocid="search.primary_button"
               >
-                {isLoading ? (
+                {displayLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <>
@@ -739,7 +859,7 @@ function MainApp() {
       {/* Results Section */}
       <main className="container max-w-5xl mx-auto px-4 py-8">
         {/* Loading */}
-        {isLoading && vehicleNumber && (
+        {displayLoading && vehicleNumber && (
           <div
             className="flex flex-col items-center justify-center py-20 gap-4"
             data-ocid="challan.loading_state"
@@ -770,97 +890,135 @@ function MainApp() {
         )}
 
         {/* Results */}
-        {!isLoading && !isError && challans !== undefined && vehicleNumber && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="mb-6 flex items-center justify-between"
-            >
-              <div>
-                <h2 className="font-display font-bold text-2xl text-foreground">
-                  Results for{" "}
-                  <span className="text-primary">{vehicleNumber}</span>
-                </h2>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  {challans.length} challan{challans.length !== 1 ? "s" : ""}{" "}
-                  found
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setVehicleNumber(null);
-                  setSearchInput("");
-                }}
-                className="gap-1.5 text-sm"
-              >
-                <Search className="w-3.5 h-3.5" /> New Search
-              </Button>
-            </motion.div>
-
-            {challans.length > 0 && <SummaryBar challans={challans} />}
-
-            {/* Empty state */}
-            {challans.length === 0 ? (
+        {!displayLoading &&
+          !isError &&
+          displayedChallans !== undefined &&
+          vehicleNumber && (
+            <>
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex flex-col items-center py-20 gap-4"
-                data-ocid="challan.empty_state"
+                className="mb-6 flex items-center justify-between"
               >
-                <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center">
-                  <CheckCircle2 className="w-10 h-10 text-success" />
-                </div>
-                <div className="text-center">
-                  <h3 className="font-display font-bold text-xl text-foreground">
-                    No Challans Found
-                  </h3>
-                  <p className="text-muted-foreground mt-1 text-sm">
-                    Great news! No pending challans for{" "}
-                    <span className="font-semibold">{vehicleNumber}</span>.
-                  </p>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Try loading demo data to see challans.
-                </p>
-              </motion.div>
-            ) : (
-              <div className="space-y-4" data-ocid="challan.list">
-                {challans.map((challan, i) => (
-                  <ChallanCard
-                    key={challan.id.toString()}
-                    challan={challan}
-                    index={i}
-                    onPay={handlePay}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Notice banner */}
-            {challans.some((c) => c.status === Status.pending) && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3"
-              >
-                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-semibold text-amber-800">
-                    Discount valid for limited time
-                  </p>
-                  <p className="text-xs text-amber-700 mt-0.5">
-                    Pay your challans now to avail up to 30% discount. Delayed
-                    payment may result in additional penalties.
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="font-display font-bold text-2xl text-foreground">
+                      Results for{" "}
+                      <span className="text-primary">{vehicleNumber}</span>
+                    </h2>
+                    {usingLiveApi ? (
+                      <Badge className="text-xs bg-green-100 text-green-700 border-green-300 hover:bg-green-100 flex items-center gap-1">
+                        <Radio className="w-3 h-3" /> Live Data
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="text-xs text-muted-foreground flex items-center gap-1"
+                      >
+                        Demo Data
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    {displayedChallans.length} challan
+                    {displayedChallans.length !== 1 ? "s" : ""} found
                   </p>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setVehicleNumber(null);
+                    setSearchInput("");
+                    setApiChallans(null);
+                    setUsingLiveApi(false);
+                  }}
+                  className="gap-1.5 text-sm"
+                >
+                  <Search className="w-3.5 h-3.5" /> New Search
+                </Button>
               </motion.div>
-            )}
-          </>
-        )}
+
+              {displayedChallans.length > 0 && (
+                <SummaryBar challans={displayedChallans} />
+              )}
+
+              {/* Empty state */}
+              {displayedChallans.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex flex-col items-center py-20 gap-4"
+                  data-ocid="challan.empty_state"
+                >
+                  <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center">
+                    <CheckCircle2 className="w-10 h-10 text-success" />
+                  </div>
+                  <div className="text-center">
+                    <h3 className="font-display font-bold text-xl text-foreground">
+                      No Challans Found
+                    </h3>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      Great news! No pending challans for{" "}
+                      <span className="font-semibold">{vehicleNumber}</span>.
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Try loading demo data to see challans.
+                  </p>
+                  {supportNumber && (
+                    <div
+                      className="mt-4 flex flex-col items-center gap-2"
+                      data-ocid="challan.support_helpline"
+                    >
+                      <p className="text-sm text-muted-foreground">
+                        Need help? Call our helpline:
+                      </p>
+                      <a
+                        href={`tel:${supportNumber}`}
+                        className="flex items-center gap-2 bg-primary/10 text-primary font-semibold text-base px-5 py-2 rounded-full hover:bg-primary/20 transition-colors"
+                      >
+                        <Phone className="w-4 h-4" />
+                        {supportNumber}
+                      </a>
+                    </div>
+                  )}
+                </motion.div>
+              ) : (
+                <div className="space-y-4" data-ocid="challan.list">
+                  {displayedChallans.map((challan, i) => (
+                    <ChallanCard
+                      key={challan.id.toString()}
+                      challan={challan}
+                      index={i}
+                      onPay={handlePay}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Notice banner */}
+              {displayedChallans.some((c) => c.status === Status.pending) && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                  className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3"
+                >
+                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-800">
+                      Discount valid for limited time
+                    </p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      Pay your challans now to avail up to 30% discount. Delayed
+                      payment may result in additional penalties.
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </>
+          )}
 
         {/* Initial state - no search yet */}
         {!vehicleNumber && (

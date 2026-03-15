@@ -36,16 +36,24 @@ export enum UtrStatus {
     approved = "approved",
     rejected = "rejected"
 }
+export interface ApiConfig {
+    apiKey: string | null;
+    apiBaseUrl: string | null;
+}
 export interface backendInterface {
     addChallan(vehicleNumber: string, violationType: string, fineAmount: bigint, date: string, location: string, officerName: string): Promise<bigint>;
     approveUtr(utrId: bigint): Promise<void>;
     getChallan(id: bigint): Promise<Challan>;
     getChallansByVehicle(vehicleNumber: string): Promise<Array<Challan>>;
+    getSupportNumber(): Promise<string | null>;
     getUpiId(): Promise<string | null>;
     getUtrSubmissions(): Promise<Array<UtrRecord>>;
     payChallan(id: bigint): Promise<void>;
     rejectUtr(utrId: bigint): Promise<void>;
     seedSampleData(): Promise<void>;
+    setSupportNumber(number: string): Promise<void>;
     setUpiId(newUpiId: string): Promise<void>;
     submitUtr(challanId: bigint, vehicleNumber: string, amount: bigint, utr: string, submittedAt: string): Promise<bigint>;
+    setApiConfig(key: string, baseUrl: string): Promise<void>;
+    getApiConfig(): Promise<{ apiKey: string | null; apiBaseUrl: string | null }>;
 }

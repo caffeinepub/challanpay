@@ -45,6 +45,9 @@ actor {
   var nextId = 1;
   var nextUtrId = 1 : Nat;
   var upiId : ?Text = null;
+  var supportNumber : ?Text = null;
+  var apiKey : ?Text = null;
+  var apiBaseUrl : ?Text = null;
 
   func applyDiscount(amount : Nat) : Nat {
     amount * 70 / 100;
@@ -98,8 +101,9 @@ actor {
   public shared ({ caller }) func seedSampleData() : async () {
     ignore await addChallan("MH12AB1234", "Speeding", 500, "2024-06-01", "Pune", "Officer Singh");
     ignore await addChallan("MH12AB1234", "Red Light", 1000, "2024-06-02", "Pune", "Officer Patel");
-    ignore await addChallan("MH14XY5678", "Wrong Parking", 300, "2024-06-03", "Mumbai", "Officer Sharma");
-    ignore await addChallan("MH14XY5678", "Overloading", 800, "2024-06-04", "Mumbai", "Officer Khan");
+    ignore await addChallan("DL3CAF9087", "Wrong Parking", 300, "2024-06-03", "Delhi", "Officer Sharma");
+    ignore await addChallan("DL3CAF9087", "Overloading", 800, "2024-06-04", "Delhi", "Officer Khan");
+    ignore await addChallan("KA05MG7654", "Speeding", 700, "2024-06-05", "Bangalore", "Officer Rao");
   };
 
   public query ({ caller }) func getChallan(id : Nat) : async Challan {
@@ -115,6 +119,23 @@ actor {
 
   public query ({ caller }) func getUpiId() : async ?Text {
     upiId;
+  };
+
+  public shared ({ caller }) func setSupportNumber(number : Text) : async () {
+    supportNumber := ?number;
+  };
+
+  public query ({ caller }) func getSupportNumber() : async ?Text {
+    supportNumber;
+  };
+
+  public shared ({ caller }) func setApiConfig(key : Text, baseUrl : Text) : async () {
+    apiKey := ?key;
+    apiBaseUrl := ?baseUrl;
+  };
+
+  public query ({ caller }) func getApiConfig() : async { apiKey : ?Text; apiBaseUrl : ?Text } {
+    { apiKey; apiBaseUrl };
   };
 
   public shared ({ caller }) func submitUtr(challanId : Nat, vehicleNumber : Text, amount : Nat, utr : Text, submittedAt : Text) : async Nat {

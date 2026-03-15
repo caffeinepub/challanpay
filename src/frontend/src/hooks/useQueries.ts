@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Challan, UtrRecord } from "../backend.d";
+import type { Challan, UtrRecord, backendInterface } from "../backend.d";
 import { useActor } from "./useActor";
 
 export function useGetChallansByVehicle(vehicleNumber: string | null) {
@@ -131,6 +131,61 @@ export function useRejectUtr() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["utrSubmissions"] });
+    },
+  });
+}
+
+export function useGetSupportNumber() {
+  const { actor, isFetching } = useActor();
+  return useQuery<string | null>({
+    queryKey: ["supportNumber"],
+    queryFn: async () => {
+      if (!actor) return null;
+      return (actor as unknown as backendInterface).getSupportNumber();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useSetSupportNumber() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (number: string) => {
+      if (!actor) throw new Error("Actor not available");
+      await (actor as unknown as backendInterface).setSupportNumber(number);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["supportNumber"] });
+    },
+  });
+}
+
+export function useGetApiConfig() {
+  const { actor, isFetching } = useActor();
+  return useQuery<{ apiKey: string | null; apiBaseUrl: string | null }>({
+    queryKey: ["apiConfig"],
+    queryFn: async () => {
+      if (!actor) return { apiKey: null, apiBaseUrl: null };
+      return (actor as unknown as backendInterface).getApiConfig();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useSetApiConfig() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { apiKey: string; apiBaseUrl: string }) => {
+      if (!actor) throw new Error("Actor not available");
+      await (actor as unknown as backendInterface).setApiConfig(
+        params.apiKey,
+        params.apiBaseUrl,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["apiConfig"] });
     },
   });
 }

@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   Loader2,
   LogOut,
+  Phone,
   Save,
   Shield,
   XCircle,
@@ -30,9 +31,11 @@ import type { UtrRecord } from "./backend.d";
 import { UtrStatus } from "./backend.d";
 import {
   useApproveUtr,
+  useGetSupportNumber,
   useGetUpiId,
   useGetUtrSubmissions,
   useRejectUtr,
+  useSetSupportNumber,
   useSetUpiId,
 } from "./hooks/useQueries";
 
@@ -235,6 +238,97 @@ function UpiSettings() {
   );
 }
 
+function SupportNumberSettings() {
+  const { data: currentSupportNumber, isLoading } = useGetSupportNumber();
+  const { mutate: setSupportNumber, isPending: saving } = useSetSupportNumber();
+  const [supportInput, setSupportInput] = useState("");
+
+  const handleSave = () => {
+    const trimmed = supportInput.trim();
+    if (!trimmed) {
+      toast.error("Please enter a support number");
+      return;
+    }
+    setSupportNumber(trimmed, {
+      onSuccess: () => {
+        toast.success("Support number updated successfully");
+        setSupportInput("");
+      },
+      onError: () => toast.error("Failed to update support number"),
+    });
+  };
+
+  return (
+    <Card className="shadow-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="font-display text-lg flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+            <Phone className="w-4 h-4 text-green-700" />
+          </div>
+          Support Helpline Number
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="bg-muted/50 rounded-lg p-3">
+          <p className="text-xs text-muted-foreground mb-1">
+            Current Support Number
+          </p>
+          {isLoading ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Loading...</span>
+            </div>
+          ) : (
+            <p className="font-mono font-semibold text-foreground text-sm">
+              {currentSupportNumber || (
+                <span className="text-muted-foreground italic">
+                  Not configured
+                </span>
+              )}
+            </p>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          This number will be shown to users when no challan is found for their
+          vehicle.
+        </p>
+        <Separator />
+        <div className="space-y-2">
+          <Label
+            htmlFor="support-input"
+            className="text-sm font-semibold text-foreground"
+          >
+            Update Support Number
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              id="support-input"
+              value={supportInput}
+              onChange={(e) => setSupportInput(e.target.value)}
+              placeholder="e.g. 1800-XXX-XXXX"
+              className="flex-1"
+              data-ocid="admin.support_number.input"
+            />
+            <Button
+              onClick={handleSave}
+              disabled={saving || !supportInput.trim()}
+              className="gap-1.5 shrink-0"
+              data-ocid="admin.support_number.save_button"
+            >
+              {saving ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              {saving ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function PaymentRequests() {
   const { data: submissions, isLoading, isError } = useGetUtrSubmissions();
 
@@ -373,7 +467,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             Admin Dashboard
           </h1>
           <p className="text-sm text-muted-foreground">
-            Manage UPI settings and review payment submissions.
+            Manage UPI settings, support number, and review payment submissions.
           </p>
         </motion.div>
 
@@ -389,6 +483,14 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.4 }}
+        >
+          <SupportNumberSettings />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.4 }}
         >
           <PaymentRequests />
         </motion.div>
